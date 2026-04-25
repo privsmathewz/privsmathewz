@@ -338,30 +338,18 @@ def main() -> None:
         mcp.run()
 
 
+
 def _run_sse() -> None:
     """Run the MCP server over HTTP/SSE for remote deployments."""
     import uvicorn
-    from starlette.middleware.base import BaseHTTPMiddleware
     from starlette.middleware.trustedhost import TrustedHostMiddleware
     from starlette.requests import Request
-    from starlette.responses import JSONResponse, PlainTextResponse
+    from starlette.responses import PlainTextResponse
 
     port = int(os.environ.get("PORT", "8000"))
-    api_key = os.environ.get("MCP_API_KEY", "")
-
-    class _BearerAuth(BaseHTTPMiddleware):
-        async def dispatch(self, request: Request, call_next):
-            if request.url.path == "/health":
-                return await call_next(request)
-            if api_key:
-                auth = request.headers.get("authorization", "")
-                if auth != f"Bearer {api_key}":
-                    return JSONResponse({"error": "unauthorized"}, status_code=401)
-            return await call_next(request)
 
     # FastMCP exposes the underlying Starlette ASGI app via sse_app().
     base_app = mcp.sse_app()
-    base_app.add_middleware(_BearerAuth)
     base_app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])
 
     # Attach a /health route for Railway's health checks.
