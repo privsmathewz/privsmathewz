@@ -1,14 +1,20 @@
 """MCP server exposing Moodle to Claude Code.
 
-Works in two auth modes (configured via env):
+Moodle auth modes:
 - token: MOODLE_TOKEN — full Web Services access
 - cookie: MOODLE_SESSION_COOKIE — page scraping + file downloads
+
+Transport modes (set MCP_TRANSPORT):
+- stdio (default) — local Claude Code usage
+- sse — HTTP/SSE for remote deployments (Railway, Render, etc.)
+  Listens on PORT (default 8000). Protect with MCP_API_KEY.
 """
 
 from __future__ import annotations
 
 import base64
 import json
+import os
 import re
 from html.parser import HTMLParser
 from typing import Any
@@ -325,7 +331,47 @@ def _parse_course_html(html: str, base: str) -> dict[str, Any]:
 
 
 def main() -> None:
-    mcp.run()
+    transport = os.environ.get("MCP_TRANSPORT", "stdio").lower()
+    if transport == "sse":
+        _run_sse()
+    else:
+        mcp.run()
+
+
+def _run_sse() -> None:
+    """Run the MCP server over HTTP/SSE for remote deployments."""
+    import uvicorn
+    from starlette.middleware.base import BaseHTTPMiddleware
+    from starlette.requests import Request
+    from starlette.responses import JSONResponse, PlainTextResponse
+
+    port = int(os.environ.get("PORT", "8000"))
+    api_key = os.environ.get("MCP_API_KEY", "")
+
+    class _BearerAuth(BaseHTTPMiddleware):
+        async def dispatch(self, request: Request, call_next):
+            if request.url.path == "/health":
+                return await call_next(request)
+            if api_key:
+                auth = request.headers.get("authorization", "")
+                if auth != f"Bearer {api_key}":
+                    return JSONResponse({"error": "unauthorized"}, status_code=401)
+            return await call_next(request)
+
+    # FastMCP exposes the underlying Starlette ASGI app via sse_app().
+    base_app = mcp.sse_app()
+    base_app.add_middleware(_BearerAuth)
+
+    # Attach a /health route for Railway's health checks.
+    from starlette.routing import Route
+
+    async def _health(request: Request):
+        return PlainTextResponse("ok")
+
+    base_app.routes.append(Route("/health", _health))
+
+    print(f"moodle-mcp SSE server starting on port {port}", flush=True)
+    uvicorn.run(base_app, host="0.0.0.0", port=port)
 
 
 if __name__ == "__main__":

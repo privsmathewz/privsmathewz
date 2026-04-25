@@ -128,10 +128,59 @@ Then in a new Claude Code session:
 
 Claude will call `list_my_courses` and `get_course_contents` automatically.
 
+## 5. Deploy to Railway (access from anywhere)
+
+Deploy once to Railway and Claude Code on any device — phone, laptop, uni PC
+— connects to the same running server without local Python installs.
+
+### One-time setup
+
+1. Create a free account at [railway.app](https://railway.app).
+2. Install the Railway CLI: `npm i -g @railway/cli` (or use the dashboard).
+3. From the `moodle-mcp/` directory:
+
+```bash
+railway login
+railway init          # creates a new project
+railway up            # builds + deploys using the Dockerfile
+```
+
+4. In the Railway dashboard → your service → **Variables**, add:
+
+| Variable | Value |
+|---|---|
+| `MOODLE_SITE_URL` | `https://moodle.mmu.ac.uk` |
+| `MOODLE_TOKEN` | your WS token — **or** — |
+| `MOODLE_SESSION_COOKIE` | your MoodleSession cookie value |
+| `MCP_API_KEY` | a long random string you make up (protects the endpoint) |
+
+5. In **Settings → Networking**, click **Generate Domain** to get a public URL
+   like `https://moodle-mcp-production.up.railway.app`.
+
+### Connect Claude Code to the remote server
+
+Run this once on each device (phone, laptop, etc.) — no Python install needed:
+
+```bash
+claude mcp add moodle \
+  --transport sse \
+  --header "Authorization: Bearer YOUR_MCP_API_KEY" \
+  https://moodle-mcp-production.up.railway.app/sse
+```
+
+Then just ask Claude: *"Get the contents of my Moodle course 194996."*
+
+### Refreshing the session cookie
+
+The `MoodleSession` cookie expires every few hours. When Claude reports a
+login redirect, grab a fresh cookie (F12 → Application → Cookies) and update
+the Railway variable — the server restarts in seconds.
+
 ## Security
 
 - Never commit `MOODLE_TOKEN` or `MOODLE_SESSION_COOKIE` — they're full
   account credentials. `.env` is gitignored for this reason.
+- Set `MCP_API_KEY` on Railway so only you can reach your deployed server.
 - A session cookie grants the same access as being logged in in the browser;
   rotate it by logging out if a value leaks.
 - The server makes requests only to `MOODLE_SITE_URL` — no third-party calls.
@@ -140,12 +189,14 @@ Claude will call `list_my_courses` and `get_course_contents` automatically.
 
 ```
 moodle-mcp/
+├── Dockerfile          # container for Railway / any Docker host
+├── railway.toml        # Railway build + deploy config
 ├── pyproject.toml
 ├── README.md
 └── src/moodle_mcp/
     ├── __init__.py
-    ├── client.py   # async Moodle WS REST client
-    └── server.py   # FastMCP server + tool definitions
+    ├── client.py       # async Moodle WS REST client (token + cookie modes)
+    └── server.py       # FastMCP server + tools (stdio + SSE transports)
 ```
 
 ## License
