@@ -342,6 +342,7 @@ def _run_sse() -> None:
     """Run the MCP server over HTTP/SSE for remote deployments."""
     import uvicorn
     from starlette.middleware.base import BaseHTTPMiddleware
+    from starlette.middleware.trustedhost import TrustedHostMiddleware
     from starlette.requests import Request
     from starlette.responses import JSONResponse, PlainTextResponse
 
@@ -361,6 +362,7 @@ def _run_sse() -> None:
     # FastMCP exposes the underlying Starlette ASGI app via sse_app().
     base_app = mcp.sse_app()
     base_app.add_middleware(_BearerAuth)
+    base_app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])
 
     # Attach a /health route for Railway's health checks.
     from starlette.routing import Route
@@ -371,7 +373,7 @@ def _run_sse() -> None:
     base_app.routes.append(Route("/health", _health))
 
     print(f"moodle-mcp SSE server starting on port {port}", flush=True)
-    uvicorn.run(base_app, host="0.0.0.0", port=port)
+    uvicorn.run(base_app, host="0.0.0.0", port=port, forwarded_allow_ips="*")
 
 
 if __name__ == "__main__":
