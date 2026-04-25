@@ -7,7 +7,17 @@ through the official Moodle Web Services API.
 Built for `moodle.mmu.ac.uk` but works with any Moodle site that has Web
 Services enabled.
 
+## Two auth modes
+
+**Token mode (preferred).** Set `MOODLE_TOKEN`. All Web Services tools work.
+
+**Cookie mode (fallback).** Set `MOODLE_SESSION_COOKIE` (the `MoodleSession`
+cookie from a logged-in browser). Page-scrape tools work; Web Services tools
+do not. Use this when your institution doesn't expose a student token.
+
 ## What Claude can do once it's wired up
+
+Token-mode tools:
 
 - `whoami` — confirm the site and logged-in user
 - `list_my_courses` — every course you're enrolled in
@@ -18,8 +28,14 @@ Services enabled.
 - `upcoming_calendar` — upcoming deadlines and events
 - `list_forum_discussions` — forum thread listing
 - `get_grades` — your grade items for a course
-- `fetch_resource` — download a pluginfile URL (returns text directly for
-  text/JSON/XML, base64 otherwise)
+
+Shared tools (work in both modes):
+
+- `fetch_page` — fetch any Moodle HTML page (e.g. `/course/view.php?id=194996`)
+- `get_course_html` — fetch + lightly parse a course page into title / text
+  blocks / resource links
+- `fetch_resource` — download an authenticated file URL; returns text for
+  text/JSON/XML, base64 otherwise
 
 ## 1. Get a Moodle Web Services token
 
@@ -45,12 +61,24 @@ pip install -e .
 
 ## 3. Configure credentials
 
-Export these in your shell (or put them in a `.env` and source it):
+Pick **one** auth mode and export it:
 
 ```bash
+# Token mode (preferred)
 export MOODLE_SITE_URL="https://moodle.mmu.ac.uk"
 export MOODLE_TOKEN="paste-your-token-here"
+
+# --- OR ---
+
+# Cookie mode (fallback)
+export MOODLE_SITE_URL="https://moodle.mmu.ac.uk"
+export MOODLE_SESSION_COOKIE="paste-MoodleSession-value-here"
 ```
+
+Cookie-mode tip: log in on a laptop, F12 → **Application** → **Cookies** →
+`https://moodle.mmu.ac.uk` → copy the `MoodleSession` value. The cookie
+expires on logout or after a few hours of inactivity — re-grab it when Claude
+reports a login redirect.
 
 Sanity check:
 
@@ -70,10 +98,21 @@ asyncio.run(main())
 
 From anywhere, run:
 
+Token mode:
+
 ```bash
 claude mcp add moodle \
   --env MOODLE_SITE_URL=https://moodle.mmu.ac.uk \
   --env MOODLE_TOKEN=YOUR_TOKEN \
+  -- /absolute/path/to/moodle-mcp/.venv/bin/moodle-mcp
+```
+
+Cookie mode:
+
+```bash
+claude mcp add moodle \
+  --env MOODLE_SITE_URL=https://moodle.mmu.ac.uk \
+  --env MOODLE_SESSION_COOKIE=YOUR_MOODLESESSION_VALUE \
   -- /absolute/path/to/moodle-mcp/.venv/bin/moodle-mcp
 ```
 
@@ -89,13 +128,13 @@ Then in a new Claude Code session:
 
 Claude will call `list_my_courses` and `get_course_contents` automatically.
 
-## Fallback: session-cookie mode (no token)
+## Security
 
-If MMU blocks Web Services tokens, you can add a simple alternative path:
-log in through a browser, copy the `MoodleSession` cookie, and set
-`MOODLE_SESSION_COOKIE=...`. The Web Services endpoint requires a token, so
-this fallback would scrape course pages instead — open an issue if you need
-this and it'll be added.
+- Never commit `MOODLE_TOKEN` or `MOODLE_SESSION_COOKIE` — they're full
+  account credentials. `.env` is gitignored for this reason.
+- A session cookie grants the same access as being logged in in the browser;
+  rotate it by logging out if a value leaks.
+- The server makes requests only to `MOODLE_SITE_URL` — no third-party calls.
 
 ## Layout
 
