@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "moodle": {
+      "type": "sse",
+      "url": "https://moodle-mcp-production.up.railway.app/sse",
+      "headers": {
+        "Authorization": "Bearer moodle-sajan-2026-xyz"
+      }
+    }
+  },
+  "projects": {
+    "C:/Windows/System32": {
+      "mcpServers": {
+        "moodle": {
+          "type": "sse",
+          "url": "https://moodle-mcp-production.up.railway.app/sse",
+          "headers": {
+            "Authorization": "Bearer moodle-sajan-2026-xyz"
+          }
+        }
+      }
+    }
+  }
+}
