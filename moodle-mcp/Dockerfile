@@ -2,12 +2,8 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install dependencies first (better layer caching)
-COPY pyproject.toml .
-RUN pip install --no-cache-dir hatchling && \
-    pip install --no-cache-dir -e . --no-build-isolation || true
-
-# Now copy source and install properly
+# Copy metadata files hatchling needs before running pip install
+COPY pyproject.toml README.md ./
 COPY src/ ./src/
 RUN pip install --no-cache-dir -e .
 
